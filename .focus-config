@@ -1,0 +1,36 @@
+[16]  # Version number. Do not delete.
+
+[[workspace]]
+.
+
+[ignore]
+.gitignore
+.git
+.vscode
+
+[[build commands]]
+build_working_dir:      .
+open_panel_on_build:    true
+error_regex:            ^(?P<file>.*):(?P<line>\d+):(?P<col>\d+): (?P<type>error|warning): (?P<msg>.*) (\[(?P<msg1>.*)\])?$  # see examples below
+auto_jump_to_error:     false
+
+[Debug Build]
+build_command:          C:\device_agent\build.bat -w
+key_binding:            F5
+
+[Debug Build]
+build_command:          gcc -w src\autogen.c -o build\autogen.exe
+key_binding:            F3
+
+[Run]
+run_command:            .\build\autogen.exe
+key_binding:            F4
+
+# [Run]                   # <- You could have commands that don't build anything and just run something
+# run_command:            ./Thueland
+# run_working_dir:        /home/redith/Documents/Thueland
+# key_binding:            Ctrl-F5
+
+# [Release]
+# build_command:          jai first.jai - release
+# key_binding:            F9

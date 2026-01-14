@@ -21,12 +21,12 @@ for arg in "$@"; do
 done
 
 # if [ AUTOGEN = 1 ]; then
-gcc src/autogen.c -o src/autogen
+gcc src/autogen.c -o build/autogen
 # fi
 
 mkdir -p build
 
-cd src
+cd build
 ./autogen
 cd ..
 
