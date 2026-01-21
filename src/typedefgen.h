@@ -12,6 +12,8 @@ typedef struct String String;
 typedef struct String_Builder_Arena String_Builder_Arena;
 typedef struct String_Builder String_Builder;
 typedef struct Arena Arena;
+typedef struct dirent dirent;
+typedef struct dirent dirent;
 
 // 
 // ENUM DEFS

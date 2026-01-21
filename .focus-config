@@ -15,7 +15,7 @@ error_regex:            ^(?P<file>.*):(?P<line>\d+):(?P<col>\d+): (?P<type>error
 auto_jump_to_error:     false
 
 [Debug Build]
-build_command:          C:\device_agent\build.bat -w
+build_command:          build.sh
 key_binding:            F5
 
 [Debug Build]

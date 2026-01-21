@@ -121,41 +121,25 @@ parse_file(char* file_name) {
       in_function_def = true;
     }
 
-    if (in_union_def || in_struct_def || in_enum_def) {
-      printf("%.*s\n", word_size, lexer.where_firstchar);
-
-      if (in_union_def) {
-        String s = {lexer.where_firstchar, word_size};
-        add_declaration(&union_defs, s, UNION);
-      }
-      else if (in_struct_def) {
-        String s = {lexer.where_firstchar, word_size};
-        add_declaration(&struct_defs, s, STRUCT);
-        printf("structs: %d\n", arrlen(struct_defs));
-        prints(struct_defs[0]);
-      }
-      else {
-        String s = {lexer.where_firstchar, word_size};
-        add_declaration(&enum_defs, s, ENUM);
-      }
-
+    if (in_union_def) {
+      String s = {lexer.where_firstchar, word_size};
+      add_declaration(&union_defs, s, UNION);
+      in_union_def = false;
+    }
+    else if (in_struct_def) {
+      String s = {lexer.where_firstchar, word_size};
+      add_declaration(&struct_defs, s, STRUCT);
       in_struct_def = false;
-      in_union_def  = false;
-      in_enum_def   = false;
+    }
+    else if (in_union_def){
+      String s = {lexer.where_firstchar, word_size};
+      add_declaration(&enum_defs, s, ENUM);
+      in_enum_def = false;
     }
 
-    if (strncmp(lexer.where_firstchar, "union", 5) == 0) {
-      in_union_def = true;
-    }
-    if (strncmp(lexer.where_firstchar, "enum", 4) == 0) {
-
-      printf("IN_ENUM\n");
-
-      in_enum_def = true;
-    }
-    if (strncmp(lexer.where_firstchar, "struct", 6) == 0) {
-      in_struct_def = true;
-    }
+    if (strncmp(lexer.where_firstchar, "union", 5) == 0) in_union_def = true;
+    if (strncmp(lexer.where_firstchar, "enum", 4) == 0) in_enum_def = true;
+    if (strncmp(lexer.where_firstchar, "struct", 6) == 0) in_struct_def = true;
   }
   free(file_buffer.data);
 }
@@ -165,7 +149,7 @@ int main() {
 
 
   parse_file("../src/base.c");
-  parse_file("../src/main_test.c");
+  parse_file("../src/main.c");
   FILE* new_f = fopen("../src/typedefgen.h", "wb");
 
   write_string(new_f, string_init("#ifndef TYPEDEFGEN_H\n#define TYPEDEFGEN_H\n"));
@@ -205,8 +189,6 @@ int main() {
     write_string(new_f, function_defs[i]);
     write_string(new_f, string_init(";"));
     write_string(new_f, string_init("\n"));
-    prints(function_defs[i]);
-    printf("\n");
   }
 
   write_string(new_f, string_init("\n#endif\n"));

@@ -21,7 +21,7 @@ for arg in "$@"; do
 done
 
 # if [ AUTOGEN = 1 ]; then
-gcc src/autogen.c -o build/autogen
+gcc -w src/autogen.c -o build/autogen
 # fi
 
 mkdir -p build
@@ -30,4 +30,6 @@ cd build
 ./autogen
 cd ..
 
-gcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG -g3 -fsanitize=address -fshort-enums -o build/game
+gcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG -g3 -fsanitize=address -fshort-enums -o build/agent
+
+# ./build/agent
