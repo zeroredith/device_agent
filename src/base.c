@@ -7,45 +7,6 @@
 #include <string.h>
 #include "types.h"
 
-#define da_init(xp) \
-    do { \
-        (xp)->data = NULL; \
-        (xp)->len = 0; \
-        (xp)->capacity = 0; \
-    } while (0)
-
-#define da_append(xs, x) ({                                                     \
-    if ((xs)->len >= (xs)->capacity) {                                          \
-        if ((xs)->capacity == 0) (xs)->capacity = 256;                          \
-        else (xs)->capacity *= 2;                                               \
-        (xs)->data = realloc((xs)->data, (xs)->capacity * sizeof(*(xs)->data)); \
-    }                                                                           \
-    (xs)->data[(xs)->len] = (x);                                                \
-    &((xs)->data[(xs)->len++]);                                                 \
-})
-
-
-#define da_free(xp) \
-    do { \
-        free((xp)->data); \
-        (xp)->data = NULL; \
-        (xp)->len = 0; \
-        (xp)->capacity = 0; \
-    } while (0)
-
-#define da_get(xs, i) (&(xs)->data[(i)])
-#define da_set(xs, x, i) \
-		do { \
-      if ((xs)->len >= (xs)->capacity) { \
-          if ((xs)->capacity == 0) (xs)->capacity = 256; \
-          else (xs)->capacity *= 2; \
-          (xs)->data = realloc((xs)->data, (xs)->capacity * sizeof(*(xs)->data)); \
-      } \
-		  (xs)->data[(i)] = (x); \
-		  (xs)->len++; \
-		} while(0)
-
-
 struct String
 {
   u8* data;
@@ -159,8 +120,8 @@ sb_init(u64 initial_capacity) {
 }
 
 function internal inline String
-sb_to_string(String_Builder* sb) {
-	return (String){sb->data, sb->len};
+sb_to_string(String_Builder sb) {
+	return (String){sb.data, sb.len};
 }
 
 function internal inline void
@@ -250,7 +211,7 @@ sb_arena_append_char(String_Builder_Arena* sb, char c)
 }
 
 function internal inline void
-sb_pop(String_Builder_Arena* sb)
+sb_arena_pop(String_Builder_Arena* sb)
 {
     if(sb->str.len > 0) sb->str.len--;
 }
@@ -404,21 +365,21 @@ to_string(String* str)
 }
 
 function internal inline bool
-string_cmp(String* s1, String* s2)
+string_cmp(String s1, String s2)
 {
-	if(memcmp(s1->data, s2->data, s1->len) == 0) return 1;
+	if(memcmp(s1.data, s2.data, s1.len) == 0) return 1;
 	else return 0;
 }
 
 function internal inline bool
-cstring_cmp(String* s1, char* s2)
+cstring_cmp(String s1, char* s2)
 {
-	if(memcmp(s1->data, s2, strlen(s2)) == 0) return 1;
+	if(memcmp(s1.data, s2, strlen(s2)) == 0) return 1;
 	else return 0;
 }
 
 function internal inline void
-trimlp(String* s)
+trimlp(String_Builder* s)
 {
 	if (!s || !s->data || s->len == 0) return;
 	u64 count = 0;
@@ -432,7 +393,7 @@ trimlp(String* s)
 }
 
 function internal inline void
-trimrp(String* s)
+trimrp(String_Builder* s)
 {
 	if (!s || !s->data || s->len == 0) return;
 
@@ -445,7 +406,7 @@ trimrp(String* s)
 }
 
 function internal inline void
-trimp(String* s)
+trimp(String_Builder* s)
 {
 	trimlp(s);
 	trimrp(s);
@@ -462,12 +423,5 @@ printsln(String s)
 {
 	printf("%.*s\n", (int)s.len, s.data);
 }
-
-
-// function internal inline void
-// itoa(s64 n, String s) {
-// 	sprintf(s.data, "%d", n);
-// }
-
 
 #define char_to_s32(c) ((s32)((c) - '0'))

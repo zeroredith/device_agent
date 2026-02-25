@@ -31,7 +31,7 @@ typedef enum Def_Type {
 
 void
 add_declaration(Array(String)* defs, String name, Def_Type type) {
-  if (cstring_cmp(&name, "{")) return;
+  if (cstring_cmp(name, "{")) return;
   String_Builder sb = sb_init(64);
   sb_append(&sb, string_init("typedef "));
 
@@ -45,7 +45,7 @@ add_declaration(Array(String)* defs, String name, Def_Type type) {
   sb_append_char(&sb, ' ');
   sb_append(&sb, name);
   sb_append_char(&sb, ';');
-  arrpush(*defs, sb_to_string(&sb));
+  arrpush(*defs, sb_to_string(sb));
 }
 
 void
@@ -137,9 +137,21 @@ parse_file(char* file_name) {
       in_enum_def = false;
     }
 
-    if (strncmp(lexer.where_firstchar, "union", 5) == 0) in_union_def = true;
-    if (strncmp(lexer.where_firstchar, "enum", 4) == 0) in_enum_def = true;
-    if (strncmp(lexer.where_firstchar, "struct", 6) == 0) in_struct_def = true;
+    if (strncmp(lexer.where_firstchar, "union", 5) == 0)  in_union_def = true;
+    if (strncmp(lexer.where_firstchar, "enum", 4) == 0)   in_enum_def = true;
+    if (strncmp(lexer.where_firstchar, "struct", 6) == 0) {
+    	char* c = lexer.where_firstchar + 6;
+    	int i;
+    	while(c[i] != '\n') i++;
+    	while (isspace(c[i])) {
+    		i++;
+    		if(c[i] == '{') in_struct_def = true;
+    	}
+    	while(i >= 0) {
+    		if (c[i] == '{') in_struct_def = true;
+    		i--;
+    	}
+    }
   }
   free(file_buffer.data);
 }

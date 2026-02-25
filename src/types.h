@@ -1,3 +1,5 @@
+#ifndef TYPES_H
+#define TYPES_H
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -23,5 +25,5 @@ typedef double f64;
 #define DEFAULT_SIZE 2048
 #define static_assert _Static_assert
 #define function
-
+#endif
 
