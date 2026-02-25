@@ -131,7 +131,7 @@ parse_file(char* file_name) {
       add_declaration(&struct_defs, s, STRUCT);
       in_struct_def = false;
     }
-    else if (in_union_def){
+    else if (in_enum_def){
       String s = {lexer.where_firstchar, word_size};
       add_declaration(&enum_defs, s, ENUM);
       in_enum_def = false;

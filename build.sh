@@ -7,7 +7,7 @@ SOURCE="src/main.c"
 NO_WARNINGS="-Wno-unused-function -Wno-missing-braces -Wno-unused-variable -Wno-unused-parameter"
 WEB=0
 AUTOGEN=1
-
+LINK="-lcurl"
 for arg in "$@"; do
 	if [ "$arg " = "-n" ]; then
 		AUTOGEN=0
@@ -30,6 +30,6 @@ cd build
 ./autogen
 cd ..
 
-gcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG -g3 -fsanitize=address -fshort-enums -o build/agent
+gcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG $LINK -g3 -fsanitize=address -fshort-enums -o build/agent
 
 # ./build/agent

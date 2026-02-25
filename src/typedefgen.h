@@ -12,10 +12,13 @@ typedef struct String String;
 typedef struct String_Builder_Arena String_Builder_Arena;
 typedef struct String_Builder String_Builder;
 typedef struct Arena Arena;
+typedef struct Gpu_Info Gpu_Info;
+typedef struct Device_Info Device_Info;
 
 // 
 // ENUM DEFS
 // 
+typedef enum Gpu_Type Gpu_Type;
 
 // 
 // UNION DEFS

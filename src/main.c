@@ -5,6 +5,7 @@
 #include <sys/sysinfo.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <curl/curl.h>
 
 #include "typedefgen.h"
 #include "types.h"
@@ -162,15 +163,32 @@ get_cpu_count() {
 	return sysconf(_SC_NPROCESSORS_ONLN); // POSIX specific
 }
 
-s64
+enum Gpu_Type {
+	AMD,
+	NVIDIA,
+	INTEL,
+	UKNOWN_OR_NOT_EXISTS,
+};
+
+struct Gpu_Info {
+	bool exists;
+	Gpu_Type gpu_type;
+	s64 power;
+	s64 temperature;
+};
+
+// TODO: Nvidia and Intel
+Gpu_Info
 get_gpu_info() {
 	char dir_path[256];
 	char file_path[256];
 	String_Builder file_content = sb_init(1024);
-	bool is_amd_gpu = false;
-	// TODO: Nvidia and Intel
-	s64 power       = -1;
-	s64 temperature = -1;
+	Gpu_Info info = {
+		.exists = false,
+		.gpu_type = UKNOWN_OR_NOT_EXISTS,
+		.power       = -1,
+		.temperature = -1,
+	};
 	int index_path = 0;
 
 	for(;;) {
@@ -188,13 +206,13 @@ get_gpu_info() {
 				trimp(&file_content);
 				if (cstring_cmp(sb_to_string(file_content), "amdgpu")) {
 					printf("device name: %s \n", file_content.data);
-					is_amd_gpu = true;
+					info.gpu_type = AMD;
 					break;
 				}
 				fclose(f);
 			}
 		}
-		if (!is_amd_gpu) {
+		if (info.gpu_type == UKNOWN_OR_NOT_EXISTS) {
 			index_path++;
 			closedir(dir);
 			continue;
@@ -207,17 +225,17 @@ get_gpu_info() {
 			if (strcmp(entry->d_name, "power1_average") == 0) {
 				snprintf(file_path, sizeof(file_path), "%s/power1_average", dir_path);
 				FILE* f = fopen(file_path, "r");
-				fscanf(f, "%lu", &power);
+				fscanf(f, "%lu", &info.power);
 
-				printf("power: %lu microwatts, %lu watts \n", power, power / 1000000);
+				printf("info.power: %lu microwatts, %lu watts \n", info.power, info.power / 1000000);
 				fclose(f);
 			}
 			if (strcmp(entry->d_name, "temp1_input") == 0) {
 				snprintf(file_path, sizeof(file_path), "%s/temp1_input", dir_path);
 				FILE* f = fopen(file_path, "r");
-				fscanf(f, "%lu", &temperature);
+				fscanf(f, "%lu", &info.temperature);
 
-				printf("temperature of gpu: %lu \n", temperature);
+				printf("info.temperature of gpu: %lu \n", info.temperature);
 				fclose(f);
 
 			}
@@ -230,6 +248,7 @@ get_gpu_info() {
 	}
 
 	free(file_content.data);
+	return info;
 	// snprintf()
 }
 
@@ -240,6 +259,15 @@ const u64 MB = 1024 * KB;
 const u64 GB = 1024 * MB;
 const u64 TB = 1024 * GB;
 
+struct Device_Info {
+	f32 cpu_use;
+	u64 available_ram;
+	u64 used_ram;
+	u64 virtual_ram_used;
+	Array(u64) cpu_frequencies;
+	Gpu_Info gpu_info;
+};
+
 int main(void) {
 
 	f64 loads[2048];
@@ -248,26 +276,33 @@ int main(void) {
 	if (cpu_use < 0) return 0;
 
 	sysinfo(&mem);
-  u64 available_ram = get_available_ram();
-  u64 used_ram = mem.totalram - mem.freeram - available_ram;
-	u64 virtual_ram_used = get_virtual_ram_used();
+	Device_Info info = {0};
+  info.available_ram = get_available_ram();
+  info.used_ram = mem.totalram - mem.freeram - info.available_ram;
+	info.virtual_ram_used = get_virtual_ram_used();
 	u64 cpu_count = get_cpu_count();
-	u64 gpu = get_gpu_info();
+	info.gpu_info = get_gpu_info();
+
+	printf("gpu info: type = %d\n exists = %d \n power = %ld \n temperature = %ld\n", info.gpu_info.gpu_type, info.gpu_info.exists, info.gpu_info.power, info.gpu_info.temperature);
 
 
   printf("cpu use %f \n", cpu_use);
 	printf("\ntemperature %f \n", get_temperature());
   printf("threads active %d \n", count_threads());
 	printf("CPUs             : %lu\n", cpu_count);
+
 	for (int i = 0; i < cpu_count; i++) {
 		u64 cpu_frequency = get_cpu_frequency(i);
+		arrpush(info.cpu_frequencies, cpu_frequency);
 		printf("CPU frequency    : CPU %d %luKhz\n", i, cpu_frequency);
 	}
-  printf("virtual used ram : %luB, %luKB, %luMB, %luGB, %luTB\n", virtual_ram_used, virtual_ram_used/KB, virtual_ram_used/MB, virtual_ram_used/GB, virtual_ram_used/TB);
+
+	for (int i = 0; i < arrlen(info.cpu_frequencies); i++) printf("frequency: %lu\n", info.cpu_frequencies[i]);
+  printf("virtual used ram : %luB, %luKB, %luMB, %luGB, %luTB\n", info.virtual_ram_used, info.virtual_ram_used/KB, info.virtual_ram_used/MB, info.virtual_ram_used/GB, info.virtual_ram_used/TB);
   printf("total ram        : %luB, %luKB, %luMB, %luGB\n", mem.totalram, mem.totalram/KB, mem.totalram/MB, mem.totalram/GB);
   printf("free ram         : %luB, %luKB, %luMB, %luGB\n", mem.freeram, mem.freeram/KB, mem.freeram/MB, mem.freeram/GB);
-  printf("available ram    : %luB, %luKB, %luMB, %luGB\n", available_ram, available_ram/KB, available_ram/MB, available_ram/GB);
-  printf("used ram         : %luB, %luKB, %luMB, %luGB\n", used_ram, used_ram/KB, used_ram/MB, used_ram/GB);
+  printf("available ram    : %luB, %luKB, %luMB, %luGB\n", info.available_ram, info.available_ram/KB, info.available_ram/MB, info.available_ram/GB);
+  printf("used ram         : %luB, %luKB, %luMB, %luGB\n", info.used_ram, info.used_ram/KB, info.used_ram/MB, info.used_ram/GB);
 	printf("total swap       : %luB, %luKB, %luMB, %luGB\n", mem.totalswap, mem.totalswap/KB, mem.totalswap/MB, mem.totalswap/GB);
 	printf("free swap        : %luB, %luKB, %luMB, %luGB\n", mem.freeswap, mem.freeswap/KB, mem.freeswap/MB, mem.freeswap/GB);
 	// for (;;) {
@@ -276,6 +311,17 @@ int main(void) {
 	//   printf("cpu use %f \n", cpu_use);
 	//   sleep(1);
 	// }
+
+	CURL *curl;
+	CURLcode result;
+	result = curl_global_init(CURL_GLOBAL_ALL);
+	curl = curl_easy_init();
+	curl_easy_setopt(curl, CURLOPT_URL, "http://postit.example.com/moo.cgi");
+  result = curl_easy_perform(curl);
+  curl_easy_strerror(result);
+
+
+	arrfree(info.cpu_frequencies);
 
 
   return 0;
