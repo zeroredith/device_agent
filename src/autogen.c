@@ -1,15 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-
-#define STB_DS_IMPLEMENTATION
-#define STB_C_LEXER_IMPLEMENTATION
-#include "stb_ds.h"
-#include "stb_c_lexer.h"
-
-// This is used to differenciate between pointers (even pointers used for arrays) and stb_ds arrays
-// which have a hidden header with the len and capacity of the array.
-#define Array(type) type*
+#include "arrays.c"
 
 typedef struct String String;
 typedef struct String_Builder_Arena String_Builder_Arena;
@@ -18,10 +10,10 @@ typedef struct Arena Arena;
 
 #include "base.c"
 
-Array(String) function_defs;
-Array(String) enum_defs;
-Array(String) struct_defs;
-Array(String) union_defs;
+Array_String function_defs;
+Array_String enum_defs;
+Array_String struct_defs;
+Array_String union_defs;
 
 typedef enum Def_Type {
   STRUCT,
@@ -30,28 +22,28 @@ typedef enum Def_Type {
 } Def_Type;
 
 void
-add_declaration(Array(String)* defs, String name, Def_Type type) {
+add_declaration(Array_String* defs, String name, Def_Type type) {
   if (cstring_cmp(name, "{")) return;
   String_Builder sb = sb_init(64);
-  sb_append(&sb, string_init("typedef "));
+  sb_append(&sb, string("typedef "));
 
   switch(type) {
-  case STRUCT: sb_append(&sb, string_init("struct ")); break;
-  case ENUM:   sb_append(&sb, string_init("enum ")); break;
-  case UNION:  sb_append(&sb, string_init("union ")); break;
+  case STRUCT: sb_append(&sb, string("struct ")); break;
+  case ENUM:   sb_append(&sb, string("enum ")); break;
+  case UNION:  sb_append(&sb, string("union ")); break;
   }
 
   sb_append(&sb, name);
   sb_append_char(&sb, ' ');
   sb_append(&sb, name);
   sb_append_char(&sb, ';');
-  arrpush(*defs, sb_to_string(sb));
+  array_add(*defs, sb_to_string(sb));
 }
 
 void
 write_string(FILE *f, String s) {
 	if(!f || !s.data) return;
-	fprintf(f, "%.*s", (int)s.len, s.data);
+	fprintf(f, "%.*s", (int)s.count, s.data);
 }
 
 void
@@ -74,27 +66,27 @@ parse_file(char* file_name) {
   stb_lexer lexer;
   char buffer_token[1024];
 
-  stb_c_lexer_init(&lexer, file_buffer.data, file_buffer.data + file_buffer.len, buffer_token, sizeof(buffer_token));
+  stb_c_lexer_init(&lexer, file_buffer.data, file_buffer.data + file_buffer.count, buffer_token, sizeof(buffer_token));
   int tok;
   bool in_function_def = false;
   bool in_struct_def = false;
   bool in_union_def = false;
   bool in_enum_def = false;
 
-  Array(char) def_buffer = 0;
+  Array_char def_buffer = {0};
 
   while((tok = stb_c_lexer_get_token(&lexer)) != 0) {
     int word_size = (int)(lexer.where_lastchar - lexer.where_firstchar+1);
 
 
     if (strncmp(lexer.where_firstchar, "{", 1) == 0 && in_function_def) {
-      arrpush(def_buffer, ';');
+      array_add(def_buffer, ';');
       in_function_def = false;
-      Array(char) tmp_arr = 0;
-      for (int i = 0; i < arrlen(def_buffer) -1; i++) arrpush(tmp_arr, def_buffer[i]);
-      String s = {tmp_arr, arrlen(tmp_arr)};
-      arrpush(function_defs, s);
-      def_buffer = 0;
+      Array_char tmp_arr = {0};
+      for (int i = 0; i < def_buffer.count -1; i++) array_add(tmp_arr, def_buffer.data[i]);
+      String s = {tmp_arr.data, tmp_arr.count};
+      array_add(function_defs, s);
+      def_buffer.count = 0;
     }
 
     if (in_function_def) {
@@ -104,17 +96,17 @@ parse_file(char* file_name) {
 
         if (c == '\0') break;
         if (c == '(' || c == ')') {
-          if (def_buffer[arrlen(def_buffer) - 1] == ' ') {
-            arrpop(def_buffer);
+          if (def_buffer.data[def_buffer.count - 1] == ' ') {
+            array_pop(def_buffer);
             no_space = true;
           }
         }
-        if (c == ',' && def_buffer[arrlen(def_buffer) - 1] == ' ') arrpop(def_buffer);
-        if (c == '*' && def_buffer[arrlen(def_buffer) - 1] == ' ') arrpop(def_buffer);
-        arrpush(def_buffer, c);
+        if (c == ',' && def_buffer.data[def_buffer.count - 1] == ' ') array_pop(def_buffer);
+        if (c == '*' && def_buffer.data[def_buffer.count - 1] == ' ') array_pop(def_buffer);
+        array_add(def_buffer, c);
       }
 
-      if (!no_space) arrpush(def_buffer, ' ');
+      if (!no_space) array_add(def_buffer, ' ');
     }
 
     if (strncmp(lexer.where_firstchar, "function", 8) == 0) {
@@ -159,51 +151,50 @@ parse_file(char* file_name) {
 
 int main() {
 
+  parse_file("./base.c");
+  parse_file("./main.c");
+  FILE* new_f = fopen("./typedefgen.h", "wb");
 
-  parse_file("../src/base.c");
-  parse_file("../src/main.c");
-  FILE* new_f = fopen("../src/typedefgen.h", "wb");
+  write_string(new_f, string("#ifndef TYPEDEFGEN_H\n#define TYPEDEFGEN_H\n"));
+  write_string(new_f, string("\n#define function\n"));
+  write_string(new_f, string("\n#include \"types.h\" \n"));
 
-  write_string(new_f, string_init("#ifndef TYPEDEFGEN_H\n#define TYPEDEFGEN_H\n"));
-  write_string(new_f, string_init("\n#define function\n"));
-  write_string(new_f, string_init("\n#include \"types.h\" \n"));
+  write_string(new_f, string("\n// \n"));
+  write_string(new_f, string("// STRUCT DEFS"));
+  write_string(new_f, string("\n// \n"));
 
-  write_string(new_f, string_init("\n// \n"));
-  write_string(new_f, string_init("// STRUCT DEFS"));
-  write_string(new_f, string_init("\n// \n"));
-
-  for (int i = 0; i < arrlen(struct_defs); i++) {
-    write_string(new_f, struct_defs[i]);
-    write_string(new_f, string_init("\n"));
+  for (int i = 0; i < struct_defs.count; i++) {
+    write_string(new_f, struct_defs.data[i]);
+    write_string(new_f, string("\n"));
   }
-  write_string(new_f, string_init("\n// \n"));
-  write_string(new_f, string_init("// ENUM DEFS"));
-  write_string(new_f, string_init("\n// \n"));
+  write_string(new_f, string("\n// \n"));
+  write_string(new_f, string("// ENUM DEFS"));
+  write_string(new_f, string("\n// \n"));
 
-  for (int i = 0; i < arrlen(enum_defs); i++) {
-    write_string(new_f, enum_defs[i]);
-    write_string(new_f, string_init("\n"));
-  }
-
-  write_string(new_f, string_init("\n// \n"));
-  write_string(new_f, string_init("// UNION DEFS"));
-  write_string(new_f, string_init("\n// \n"));
-
-  for (int i = 0; i < arrlen(union_defs); i++) {
-    write_string(new_f, union_defs[i]);
-    write_string(new_f, string_init("\n"));
-  }
-  write_string(new_f, string_init("\n// \n"));
-  write_string(new_f, string_init("// FUNCTION DEFS"));
-  write_string(new_f, string_init("\n// \n"));
-
-  for (int i = 0; i < arrlen(function_defs); i++) {
-    write_string(new_f, function_defs[i]);
-    write_string(new_f, string_init(";"));
-    write_string(new_f, string_init("\n"));
+  for (int i = 0; i < enum_defs.count; i++) {
+    write_string(new_f, enum_defs.data[i]);
+    write_string(new_f, string("\n"));
   }
 
-  write_string(new_f, string_init("\n#endif\n"));
+  write_string(new_f, string("\n// \n"));
+  write_string(new_f, string("// UNION DEFS"));
+  write_string(new_f, string("\n// \n"));
+
+  for (int i = 0; i < union_defs.count; i++) {
+    write_string(new_f, union_defs.data[i]);
+    write_string(new_f, string("\n"));
+  }
+  write_string(new_f, string("\n// \n"));
+  write_string(new_f, string("// FUNCTION DEFS"));
+  write_string(new_f, string("\n// \n"));
+
+  for (int i = 0; i < function_defs.count; i++) {
+    write_string(new_f, function_defs.data[i]);
+    write_string(new_f, string(";"));
+    write_string(new_f, string("\n"));
+  }
+
+  write_string(new_f, string("\n#endif\n"));
   fclose(new_f);
 
 

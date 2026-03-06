@@ -14,6 +14,10 @@ open_panel_on_build:    true
 error_regex:            ^(?P<file>.*):(?P<line>\d+):(?P<col>\d+): (?P<type>error|warning): (?P<msg>.*) (\[(?P<msg1>.*)\])?$  # see examples below
 auto_jump_to_error:     false
 
+[Run]
+run_command							tcc ./src/main.c -run -lcurl -g3 -fsanitize=address -fshort-enums
+key_binding							F6
+
 [Debug Build]
 build_command:          build.sh
 key_binding:            F5

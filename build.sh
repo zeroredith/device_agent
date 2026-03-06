@@ -26,10 +26,6 @@ gcc -w src/autogen.c -o build/autogen
 
 mkdir -p build
 
-cd build
-./autogen
-cd ..
-
-gcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG $LINK -g3 -fsanitize=address -fshort-enums -o build/agent
+tcc $SOURCE $WARNINGS $NO_WARNINGS $DEBUG $LINK -g3 -fsanitize=address -fshort-enums -o build/agent
 
 # ./build/agent

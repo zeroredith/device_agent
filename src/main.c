@@ -10,10 +10,8 @@
 #include "typedefgen.h"
 #include "types.h"
 #include "base.c"
-
-#define STB_DS_IMPLEMENTATION
-#include "stb_ds.h"
-#define Array(type) type*
+#include "arrays.c"
+#include "jsmn.h"
 
 f32
 get_temperature() {
@@ -202,7 +200,7 @@ get_gpu_info() {
 				snprintf(file_path, sizeof(file_path), "%s/name", dir_path);
 				FILE* f = fopen(file_path, "r");
 				fscanf(f, "%s", file_content.data);
-				file_content.len = strlen(file_content.data);
+				file_content.count = strlen(file_content.data);
 				trimp(&file_content);
 				if (cstring_cmp(sb_to_string(file_content), "amdgpu")) {
 					printf("device name: %s \n", file_content.data);
@@ -254,21 +252,82 @@ get_gpu_info() {
 
 
 
-const u64 KB = 1024;
-const u64 MB = 1024 * KB;
-const u64 GB = 1024 * MB;
-const u64 TB = 1024 * GB;
+#define KB 1024ULL
+#define MB (1024ULL * KB)
+#define GB (1024ULL * MB)
+#define TB (1024ULL * GB)
 
 struct Device_Info {
 	f32 cpu_use;
 	u64 available_ram;
 	u64 used_ram;
 	u64 virtual_ram_used;
-	Array(u64) cpu_frequencies;
+	Array_u64 cpu_frequencies;
 	Gpu_Info gpu_info;
 };
 
+char* base_api_route = "http://localhost:5220";
+#define BASE_API_ROUTE "http://localhost:5220"
+
+CURL *curl;
+CURLcode result;
+
+struct Static_Arena {
+	u64 count;
+	u64 capacity;
+	u8* data;
+};
+
+u64
+write_callback(void* content, u64 size, u64 count, void* userp) {
+	u64 real_size = size * count;
+
+	Static_Arena* arena = (Static_Arena*)userp;
+
+	if(arena->count + real_size > arena->capacity) {
+		Static_Arena* new_chunk = malloc(sizeof(Static_Arena));
+		u64 new_cap = (arena->capacity + real_size) * 2;
+		u8* tmp = realloc(arena->data, new_cap);
+		if (!tmp) return 0;
+		arena->data = tmp;
+		arena->capacity = new_cap;
+	}
+
+	memcpy(arena->data + arena->count, content, real_size);
+	arena->count += real_size;
+
+	return real_size;
+}
+
+
+
+String
+curl_get(char* route) {
+	curl = curl_easy_init();
+
+	Static_Arena arena = {0};
+	arena.capacity = 4096;
+	arena.count = 0;
+	arena.data = malloc(arena.capacity);
+
+
+	curl_easy_setopt(curl, CURLOPT_URL, route);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &arena);
+
+  result = curl_easy_perform(curl);
+
+  printf("error : %s \n", curl_easy_strerror(result));
+  printf("result : %.*s", arena.count, arena.data);
+
+
+  curl_easy_cleanup(curl);
+  curl_global_cleanup();
+  return (String){arena.data, arena.count};
+}
+
 int main(void) {
+	result = curl_global_init(CURL_GLOBAL_ALL);
 
 	f64 loads[2048];
 	u64 n_loads;
@@ -293,11 +352,11 @@ int main(void) {
 
 	for (int i = 0; i < cpu_count; i++) {
 		u64 cpu_frequency = get_cpu_frequency(i);
-		arrpush(info.cpu_frequencies, cpu_frequency);
+		array_add(info.cpu_frequencies, cpu_frequency);
 		printf("CPU frequency    : CPU %d %luKhz\n", i, cpu_frequency);
 	}
 
-	for (int i = 0; i < arrlen(info.cpu_frequencies); i++) printf("frequency: %lu\n", info.cpu_frequencies[i]);
+	for (int i = 0; i < info.cpu_frequencies.count; i++) printf("frequency: %lu\n", info.cpu_frequencies.data[i]);
   printf("virtual used ram : %luB, %luKB, %luMB, %luGB, %luTB\n", info.virtual_ram_used, info.virtual_ram_used/KB, info.virtual_ram_used/MB, info.virtual_ram_used/GB, info.virtual_ram_used/TB);
   printf("total ram        : %luB, %luKB, %luMB, %luGB\n", mem.totalram, mem.totalram/KB, mem.totalram/MB, mem.totalram/GB);
   printf("free ram         : %luB, %luKB, %luMB, %luGB\n", mem.freeram, mem.freeram/KB, mem.freeram/MB, mem.freeram/GB);
@@ -312,16 +371,9 @@ int main(void) {
 	//   sleep(1);
 	// }
 
-	CURL *curl;
-	CURLcode result;
-	result = curl_global_init(CURL_GLOBAL_ALL);
-	curl = curl_easy_init();
-	curl_easy_setopt(curl, CURLOPT_URL, "http://postit.example.com/moo.cgi");
-  result = curl_easy_perform(curl);
-  curl_easy_strerror(result);
-
-
-	arrfree(info.cpu_frequencies);
+	curl_get(BASE_API_ROUTE "/api/agents/");
+	jsmn_parser parser;
+	jsmntok_t tokens[1024];
 
 
   return 0;
